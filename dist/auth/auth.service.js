@@ -19,13 +19,32 @@ let AuthService = class AuthService {
         this.userService = userService;
         this.jwtService = jwtService;
     }
-    async login(userDto) { }
+    async login(userDto) {
+        const user = await this.validateUser(userDto);
+        return this.generateToken(user);
+    }
     async registration(userDto) {
         const condidate = await this.userService.getUserByEmail(userDto.email);
         if (condidate) {
             throw new common_1.HttpException('Пользователь с таким email существует', common_1.HttpStatus.BAD_REQUEST);
         }
-        const hashPassword = await bcrypt;
+        const hashPassword = await bcrypt.hash(userDto.password, 5);
+        const user = await this.userService.createUser(Object.assign(Object.assign({}, userDto), { password: hashPassword }));
+        return this.generateToken(user);
+    }
+    async generateToken(user) {
+        const payload = { email: user.email, id: user.id, roles: user.roles };
+        return {
+            token: this.jwtService.sign(payload),
+        };
+    }
+    async validateUser(userDto) {
+        const user = await this.userService.getUserByEmail(userDto.email);
+        const passwardEquals = await bcrypt.compare(userDto.password, user.password);
+        if (user && passwardEquals) {
+            return user;
+        }
+        throw new common_1.UnauthorizedException({ message: 'некорректный емайл или пароль' });
     }
 };
 AuthService = __decorate([
